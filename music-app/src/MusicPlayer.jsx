@@ -206,7 +206,7 @@ const MusicPlayer = () => {
             )}
           </Box>
           
-          <Tooltip title="Information" arrow>
+          <Tooltip title="React-based music player." arrow>
             <IconButton 
               color="inherit" 
               onClick={handleInfoClick}
@@ -433,19 +433,16 @@ const MusicPlayer = () => {
             </Typography>
             
             <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.7 }}>
-              MusePlay is a sleek, modern web music player designed to provide an immersive audio experience. 
-              With its intuitive interface and responsive design, MusePlay makes it easy to enjoy your favorite tracks 
-              with style. The application automatically adjusts volume for comfortable listening and provides a 
-              visually engaging experience with album art display and dynamic animations.
+            MusePlay includes a smooth volume fade-in feature to enhance the listening experience. When a song is paused while the volume is set above 50, the player automatically lowers it to 50. This prevents any sudden drop in sound and ensures a more natural transition when pausing music.
             </Typography>
             
             <Typography variant="body1" sx={{ mb: 4, lineHeight: 1.7 }}>
-              This player fetches music directly from a GitHub repository, providing a seamless streaming experience
-              with essential playback controls including play/pause, skip, volume adjustment, and progress tracking.
-              The elegant dark theme ensures comfortable viewing in any lighting condition while maintaining a 
-              professional aesthetic.
+            Once playback resumes, MusePlay gradually restores the previous volume level after a short delay if it was initially higher than 50. This keeps the audio experience seamless, maintaining user preferences without abrupt changes for a more immersive and enjoyable listening session.
             </Typography>
 
+            <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.7 }}>
+              Music is being streamed from a github repository named music-files. Find the repository from the github profile provided below.
+              </Typography>
             {/* Creator Information */}
             <Box sx={{ mt: 5, mb: 2 }}>
               <Typography 
@@ -477,17 +474,14 @@ const MusicPlayer = () => {
                     Raja Rajan
                   </Typography>
                   <Typography variant="body2" sx={{ color: "#aaa", mb: 1 }}>
-                    Full Stack Developer & UI/UX Enthusiast
+                    Full Stack Developer
                   </Typography>
                   <Stack direction="row" spacing={1}>
-                    <IconButton size="small" sx={{ color: "#bb86fc" }}>
+                    <IconButton href="https://github.com/rajarajan15" size="small" sx={{ color: "#bb86fc" }}>
                       <GitHub fontSize="small" />
                     </IconButton>
-                    <IconButton size="small" sx={{ color: "#bb86fc" }}>
+                    <IconButton href="https://www.linkedin.com/in/rajarajan-a-p/" size="small" sx={{ color: "#bb86fc" }}>
                       <LinkedIn fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" sx={{ color: "#bb86fc" }}>
-                      <Twitter fontSize="small" />
                     </IconButton>
                   </Stack>
                 </Box>
@@ -521,10 +515,10 @@ const MusicPlayer = () => {
           }}>
             <Box sx={{ mb: { xs: 2, sm: 0 } }}>
               <Typography variant="body2" sx={{ color: "#aaa" }}>
-                © 2025 MusePlay. All rights reserved.
+                © 2025 MusePlay.
               </Typography>
               <Typography variant="caption" sx={{ color: "#777", display: "block", mt: 0.5 }}>
-                Built with React & Material UI
+                Built with React
               </Typography>
             </Box>
             
