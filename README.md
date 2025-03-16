@@ -27,10 +27,6 @@ MusePlay is a simple and user-friendly music player with an automatic volume adj
 - Displays the current playback position of the track.  
 - Allows users to seek to a specific part of the song.
 
-### 6. Playlist Management  
-- Users can view and navigate through the playlist.  
-- Option to add and remove tracks from the playlist.
-
 ## Tech Stack
 
 - **Frontend:** React.js, Material UI  
