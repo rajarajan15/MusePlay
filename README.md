@@ -1,6 +1,6 @@
 # MusePlay - Music Player Application
 
-MusePlay is a simple and user-friendly music player built using React and Material UI. It provides an intuitive interface for playing and managing audio tracks.
+MusePlay is a simple and user-friendly music player with an automatic volume adjustment feature, built using React and Material UI.
 
 ## Features
 
@@ -15,6 +15,9 @@ MusePlay is a simple and user-friendly music player built using React and Materi
 ### 3. Volume Control  
 - Adjust the audio volume using a slider.  
 - Mute/unmute functionality available.
+- Music fade in functionality when resumed from the middle portion.
+- Reduce and gradually increase the volume when played from the middle.
+- Fade in applied when volume is above 50.
 
 ### 4. Responsive Design  
 - Fully optimized for desktops, tablets, and mobile devices.  
@@ -32,7 +35,7 @@ MusePlay is a simple and user-friendly music player built using React and Materi
 
 - **Frontend:** React.js, Material UI  
 - **Build Tool:** Vite  
-- **Deployment:** Netlify  
+- **Deployment:** Vercel  
 
 ## Installation
 
