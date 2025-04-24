@@ -4,20 +4,20 @@ MusePlay is a simple and user-friendly music player with an automatic volume adj
 
 ## Features
 
-### 1. Play & Pause Functionality  
-- Users can play and pause audio tracks using the controls.  
-- The currently playing track is visually highlighted.
-
-### 2. Next & Previous Track Navigation  
-- Users can switch between tracks using the next and previous buttons.  
-- Seamless track transition without delay.
-
-### 3. Volume Control  
+### 1. Volume Control - Key Functionality
 - Adjust the audio volume using a slider.  
 - Mute/unmute functionality available.
 - Music fade in functionality when resumed from the middle portion.
 - Reduce and gradually increase the volume when played from the middle.
 - Fade in applied when volume is above 50.
+
+### 2. Next & Previous Track Navigation  
+- Users can switch between tracks using the next and previous buttons.  
+- Seamless track transition without delay.
+
+### 3. Play & Pause Functionality  
+- Users can play and pause audio tracks using the controls.  
+- The currently playing track is visually highlighted.
 
 ### 4. Responsive Design  
 - Fully optimized for desktops, tablets, and mobile devices.  
