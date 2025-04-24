@@ -19,13 +19,17 @@ MusePlay is a simple and user-friendly music player with an automatic volume adj
 - Users can play and pause audio tracks using the controls.  
 - The currently playing track is visually highlighted.
 
-### 4. Responsive Design  
-- Fully optimized for desktops, tablets, and mobile devices.  
-- Uses Material UI for a modern and clean UI.
-
-### 5. Track Progress & Seek Bar  
+### 4. Track Progress & Seek Bar  
 - Displays the current playback position of the track.  
 - Allows users to seek to a specific part of the song.
+
+### 5. Music Streaming
+- Music is streamed from a git repository named music-files.
+- No files are imported manually in the application.
+
+### 6. Responsive Design  
+- Fully optimized for desktops, tablets, and mobile devices.  
+- Uses Material UI for a modern and clean UI.
 
 ## Tech Stack
 
