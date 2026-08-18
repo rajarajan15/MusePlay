@@ -1,22 +1,64 @@
-import { Album, GitHub, Info as InfoIcon, LinkedIn, MusicNote, Pause, PlayArrow, SkipNext, SkipPrevious, Twitter, VolumeMute, VolumeUp } from "@mui/icons-material";
-import { AppBar, Avatar, Box, Container, IconButton, Link, Paper, Slider, Stack, Toolbar, Tooltip, Typography } from "@mui/material";
+import { Album, DarkMode, GitHub, Info as InfoIcon, LightMode, LinkedIn, MusicNote, Pause, PlayArrow, QueueMusic, SkipNext, SkipPrevious, UploadFile, VolumeMute, VolumeUp } from "@mui/icons-material";
+import { Alert, AppBar, Avatar, Box, Button, Container, IconButton, Link, List, ListItemAvatar, ListItemButton, ListItemText, Pagination, Paper, Slider, Stack, Toolbar, Tooltip, Typography } from "@mui/material";
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 
 const REPO_API_URL = "https://api.github.com/repos/rajarajan15/music-files/contents/";
+const SONGS_PER_PAGE = 6;
+
+const themes = {
+  light: {
+    pageBg: "#f5f1e6",
+    pageAccent: "#d8cfba",
+    pageGlow: "rgba(179, 85, 47, 0.18)",
+    paper: "#fbf8f0",
+    paperAlt: "#ece5d3",
+    paperStripe: "#e4dcc6",
+    ink: "#211f1a",
+    muted: "#786f61",
+    primary: "#4a5d3a",
+    primaryDark: "#3d4d30",
+    accent: "#b3552f",
+    shadow: "#211f1a"
+  },
+  dark: {
+    pageBg: "#111315",
+    pageAccent: "#2d3328",
+    pageGlow: "rgba(183, 124, 77, 0.2)",
+    paper: "#1d211c",
+    paperAlt: "#293026",
+    paperStripe: "#232820",
+    ink: "#f4ead7",
+    muted: "#b7aa93",
+    primary: "#9ab475",
+    primaryDark: "#7f985d",
+    accent: "#d28a54",
+    shadow: "#050607"
+  }
+};
 
 const MusicPlayer = () => {
   const audioRef = useRef(null);
+  const localObjectUrlsRef = useRef([]);
+  const fadeRestoreVolumeRef = useRef(70);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(70);
   const [isMuted, setIsMuted] = useState(false);
   const [songIndex, setSongIndex] = useState(0);
   const [songs, setSongs] = useState([]);
-  const [prevVolume, setPrevVolume] = useState(70); // Store previous volume before reduction
+  const [isLoadingSongs, setIsLoadingSongs] = useState(true);
+  const [songsError, setSongsError] = useState("");
+  const [playlistPage, setPlaylistPage] = useState(1);
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
   
   // Song duration and progress
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+
+  const currentSong = songs[songIndex];
+  const theme = isDarkTheme ? themes.dark : themes.light;
+  const playlistPageCount = Math.max(1, Math.ceil(songs.length / SONGS_PER_PAGE));
+  const visibleSongs = songs.slice((playlistPage - 1) * SONGS_PER_PAGE, playlistPage * SONGS_PER_PAGE);
 
   useEffect(() => {
     axios.get(REPO_API_URL)
@@ -38,36 +80,63 @@ const MusicPlayer = () => {
             };
           });
         setSongs(mp3Files);
+        setSongsError("");
       })
-      .catch(error => console.error("Error fetching songs:", error));
+      .catch(error => {
+        console.error("Error fetching songs:", error);
+        setSongsError("Unable to load songs from the GitHub music repository.");
+      })
+      .finally(() => setIsLoadingSongs(false));
+  }, []);
+
+  useEffect(() => {
+    const objectUrls = localObjectUrlsRef.current;
+
+    return () => {
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (songs.length > 0) {
-      audio.src = songs[songIndex]?.url;
-      if (isPlaying) audio.play();
+    if (!audio || !currentSong) return;
+
+    if (audio.src !== currentSong.url) {
+      audio.src = currentSong.url;
     }
-  }, [songIndex, songs]);
+
+    if (isPlaying) {
+      audio.play().catch(() => setIsPlaying(false));
+    }
+  }, [currentSong, isPlaying]);
+
+  useEffect(() => {
+    if (playlistPage > playlistPageCount) {
+      setPlaylistPage(playlistPageCount);
+    }
+  }, [playlistPage, playlistPageCount]);
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
+
+    fadeRestoreVolumeRef.current = volume;
   }, [volume, isMuted]);
 
   // Volume adjustment only when resuming playback
   useEffect(() => {
     let lowerVolumeTimeout, restoreVolumeTimeout;
 
-    if (isPlaying && volume > 60) {
+    if (isPlaying && fadeRestoreVolumeRef.current > 60) {
+      const originalVolume = fadeRestoreVolumeRef.current;
+
       lowerVolumeTimeout = setTimeout(() => {
-        setPrevVolume(volume); // Save current volume before reducing
         setVolume(50); // Reduce volume after 3 seconds
       }, 0);
 
       restoreVolumeTimeout = setTimeout(() => {
-        setVolume(prevVolume); // Restore previous volume after 5 more seconds
+        setVolume(originalVolume); // Restore previous volume after 5 more seconds
       }, 3000);
     }
 
@@ -78,6 +147,8 @@ const MusicPlayer = () => {
   }, [isPlaying]); // Runs only when playback starts
 
   const togglePlayPause = () => {
+    if (!audioRef.current || songs.length === 0) return;
+
     if (!isPlaying) {
       setIsPlaying(true);
       audioRef.current.play();
@@ -88,13 +159,61 @@ const MusicPlayer = () => {
   };
 
   const handleNextSong = () => {
+    if (songs.length === 0) return;
+
     setSongIndex((prevIndex) => (prevIndex + 1) % songs.length);
     setIsPlaying(true);
   };
 
   const handlePreviousSong = () => {
+    if (songs.length === 0) return;
+
     setSongIndex((prevIndex) => (prevIndex - 1 + songs.length) % songs.length);
     setIsPlaying(true);
+  };
+
+  const handleSongSelect = (index) => {
+    setSongIndex(index);
+    setIsPlaying(true);
+  };
+
+  const handlePlaylistPageChange = (event, value) => {
+    setPlaylistPage(value);
+  };
+
+  const handleLocalSongUpload = (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    const mp3Files = selectedFiles.filter(
+      (file) => file.type === "audio/mpeg" || file.name.toLowerCase().endsWith(".mp3")
+    );
+
+    if (mp3Files.length === 0) {
+      event.target.value = "";
+      return;
+    }
+
+    const localSongs = mp3Files.map((file) => {
+      const objectUrl = URL.createObjectURL(file);
+      localObjectUrlsRef.current.push(objectUrl);
+
+      return {
+        name: file.name.replace(/\.mp3$/i, ""),
+        url: objectUrl,
+        coverUrl: null,
+        isLocal: true
+      };
+    });
+
+    setSongs((prevSongs) => {
+      const nextSongs = [...prevSongs, ...localSongs];
+      const firstUploadedSongIndex = prevSongs.length;
+      setSongIndex(firstUploadedSongIndex);
+      setPlaylistPage(Math.ceil(nextSongs.length / SONGS_PER_PAGE));
+      setIsPlaying(true);
+      return nextSongs;
+    });
+
+    event.target.value = "";
   };
 
   const handleVolumeChange = (event, newValue) => {
@@ -150,18 +269,30 @@ const MusicPlayer = () => {
       height: "100vh", 
       display: "flex", 
       flexDirection: "column",
-      background: "#121212", // Dark theme background
+      backgroundColor: theme.pageBg,
+      backgroundImage: `
+        radial-gradient(circle at 18% 18%, ${theme.pageGlow} 0 130px, transparent 280px),
+        radial-gradient(circle at 82% 12%, ${theme.pageGlow} 0 110px, transparent 260px),
+        linear-gradient(135deg, transparent 0 47%, ${theme.pageAccent} 47% 48%, transparent 48% 100%),
+        radial-gradient(${theme.pageAccent} 0.8px, transparent 0.8px)
+      `,
+      backgroundSize: "auto, auto, 42px 42px, 8px 8px",
       position: "fixed",
       top: 0,
       left: 0,
+      color: theme.ink,
+      transition: "background-color 0.25s ease, color 0.25s ease",
       overflowY: "auto" // Allow scrolling to see description and footer
     }}>
       {/* Enhanced AppBar with application name and info button */}
       <AppBar 
         position="static" 
         sx={{ 
-          background: "linear-gradient(90deg, #1a1a1a 0%, #2d1b69 100%)",
-          boxShadow: "0 3px 15px rgba(0, 0, 0, 0.4)"
+          background: theme.paper,
+          color: theme.ink,
+          borderBottom: `1.5px solid ${theme.ink}`,
+          boxShadow: `0 4px 0 ${theme.shadow}`,
+          transition: "background-color 0.25s ease, color 0.25s ease"
         }}
       >
         <Toolbar sx={{ justifyContent: "space-between" }}>
@@ -170,9 +301,9 @@ const MusicPlayer = () => {
               sx={{ 
                 mr: 1.5, 
                 minHeight: 80,
-                color: "#bb86fc", 
+                color: theme.primary, 
                 fontSize: 28,
-                filter: "drop-shadow(0 2px 4px rgba(187, 134, 252, 0.3))"
+                filter: "none"
               }} 
             />
             <Typography 
@@ -180,13 +311,8 @@ const MusicPlayer = () => {
               component="div" 
               sx={{ 
                 fontWeight: 700, 
-                letterSpacing: "0.5px",
-                background: "linear-gradient(90deg, #e0e0e0 0%, #bb86fc 100%)",
-                backgroundClip: "text",
-                textFillColor: "transparent",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                textShadow: "0 2px 10px rgba(187, 134, 252, 0.2)"
+                letterSpacing: "0.08em",
+                textTransform: "uppercase"
               }}
             >
               MusePlay
@@ -196,8 +322,9 @@ const MusicPlayer = () => {
                 variant="body2" 
                 sx={{ 
                   ml: 2, 
-                  color: "#aaa", 
-                  fontStyle: "italic",
+                  color: theme.muted, 
+                  fontStyle: "normal",
+                  letterSpacing: "0.04em",
                   display: { xs: "none", sm: "block" }
                 }}
               >
@@ -206,14 +333,41 @@ const MusicPlayer = () => {
             )}
           </Box>
           
+          <Stack direction="row" spacing={1} alignItems="center">
+          <Tooltip title={isDarkTheme ? "Switch to light theme" : "Switch to dark theme"} arrow>
+            <IconButton 
+              color="inherit" 
+              onClick={() => setIsDarkTheme((current) => !current)}
+              sx={{ 
+                bgcolor: theme.paperAlt,
+                border: `1.5px solid ${theme.ink}`,
+                borderRadius: "4px",
+                boxShadow: `2px 2px 0 ${theme.shadow}`,
+                '&:hover': { 
+                  bgcolor: theme.paperStripe,
+                  transform: "translate(1px, 1px)",
+                  boxShadow: `1px 1px 0 ${theme.shadow}`
+                },
+                transition: "all 0.2s"
+              }}
+            >
+              {isDarkTheme ? <LightMode /> : <DarkMode />}
+            </IconButton>
+          </Tooltip>
+
           <Tooltip title="React-based music player." arrow>
             <IconButton 
               color="inherit" 
               onClick={handleInfoClick}
               sx={{ 
-                bgcolor: "rgba(255, 255, 255, 0.08)",
+                bgcolor: theme.paperAlt,
+                border: `1.5px solid ${theme.ink}`,
+                borderRadius: "4px",
+                boxShadow: `2px 2px 0 ${theme.shadow}`,
                 '&:hover': { 
-                  bgcolor: "rgba(255, 255, 255, 0.15)" 
+                  bgcolor: theme.paperStripe,
+                  transform: "translate(1px, 1px)",
+                  boxShadow: `1px 1px 0 ${theme.shadow}`
                 },
                 transition: "all 0.2s"
               }}
@@ -221,6 +375,7 @@ const MusicPlayer = () => {
               <InfoIcon />
             </IconButton>
           </Tooltip>
+          </Stack>
         </Toolbar>
       </AppBar>
 
@@ -236,18 +391,20 @@ const MusicPlayer = () => {
           display: "flex", 
           alignItems: "center", 
           justifyContent: "center",
-          py: 4
+          py: { xs: 3, sm: 5 }
         }}>
           <Paper 
             elevation={10}
             sx={{
               width: "100%",
               maxWidth: 400,
-              borderRadius: 4,
-              bgcolor: "#1e1e1e", // Dark theme paper background
+              border: `1.5px solid ${theme.ink}`,
+              borderRadius: 2,
+              bgcolor: theme.paper,
               overflow: "hidden",
-              boxShadow: "0 12px 40px rgba(0, 0, 0, 0.3)",
-              color: "#e0e0e0" // Light text for dark theme
+              boxShadow: `6px 6px 0 ${theme.shadow}`,
+              color: theme.ink,
+              transition: "background-color 0.25s ease, color 0.25s ease"
             }}
           >
             <audio 
@@ -271,8 +428,10 @@ const MusicPlayer = () => {
                     textAlign: "center", 
                     position: "relative",
                     overflow: "hidden",
-                    background: "linear-gradient(to bottom, #8e2de2, #4a00e0)",
-                    color: "white"
+                    background: `repeating-linear-gradient(135deg, ${theme.paperAlt} 0 8px, ${theme.paperStripe} 8px 14px)`,
+                    color: theme.ink,
+                    borderBottom: `1.5px solid ${theme.ink}`,
+                    '&::before': { content: '"SIDE A / PAPER DECK"', position: "absolute", top: 12, left: 14, px: 0.75, py: 0.25, border: `1.5px solid ${theme.ink}`, bgcolor: theme.paper, fontSize: 10, letterSpacing: "0.08em" }
                   }}
                 >
                   <Box 
@@ -280,13 +439,14 @@ const MusicPlayer = () => {
                       width: 180,
                       height: 180,
                       mb: 3,
-                      borderRadius: "50%",
+                      borderRadius: 2,
                       overflow: "hidden",
-                      bgcolor: "#2a2a2a", // Darker background for album cover
+                      bgcolor: theme.paper,
+                      border: `1.5px solid ${theme.ink}`,
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
-                      boxShadow: "0 8px 30px rgba(0, 0, 0, 0.4)",
+                      boxShadow: `4px 4px 0 ${theme.shadow}`,
                       animation: isPlaying ? "spin 20s linear infinite" : "none",
                       "@keyframes spin": {
                         "0%": { transform: "rotate(0deg)" },
@@ -305,17 +465,22 @@ const MusicPlayer = () => {
                         }}
                       />
                     ) : (
-                      <Album sx={{ fontSize: 80, color: "#9e9e9e" }} className="fallback-icon" />
+                      <Album sx={{ fontSize: 80, color: theme.primary }} className="fallback-icon" />
                     )}
                     <Album 
-                      sx={{ fontSize: 80, color: "#9e9e9e", display: "none" }} 
+                      sx={{ fontSize: 80, color: theme.primary, display: "none" }} 
                       className="fallback-icon" 
                     />
                   </Box>
                   
-                  <Typography variant="h5" fontWeight="600" sx={{ mb: 0.5 }}>
-                    {songs[songIndex]?.name}
+                  <Typography variant="h5" fontWeight="700" sx={{ mb: 0.5, letterSpacing: "0.03em", textTransform: "uppercase" }}>
+                    {currentSong?.name}
                   </Typography>
+                  {currentSong?.isLocal && (
+                    <Typography variant="caption" sx={{ color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Imported MP3
+                    </Typography>
+                  )}
                 </Box>
 
                 {/* Player Controls */}
@@ -330,24 +495,27 @@ const MusicPlayer = () => {
                       aria-labelledby="progress-slider"
                       size="small"
                       sx={{ 
-                        color: "#bb86fc", // Changed to match toolbar accent
+                        color: theme.primary,
+                        height: 8,
+                        '& .MuiSlider-rail': { opacity: 1, bgcolor: theme.paperStripe, border: `1.5px solid ${theme.ink}` },
+                        '& .MuiSlider-track': { border: `1.5px solid ${theme.ink}` },
                         mb: 1,
                         "& .MuiSlider-thumb": {
-                          width: 12,
-                          height: 12,
+                          width: 0,
+                          height: 0,
                           transition: "0.3s all",
                           "&:hover, &.Mui-active": {
-                            width: 14,
-                            height: 14,
+                            width: 0,
+                            height: 0,
                           }
                         }
                       }}
                     />
                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ color: "#aaa" }}>
+                      <Typography variant="caption" sx={{ color: theme.muted }}>
                         {formatTime(currentTime)}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "#aaa" }}>
+                      <Typography variant="caption" sx={{ color: theme.muted }}>
                         {formatTime(duration)}
                       </Typography>
                     </Box>
@@ -355,32 +523,34 @@ const MusicPlayer = () => {
 
                   {/* Controls */}
                   <Stack direction="row" spacing={2} justifyContent="center" alignItems="center" sx={{ mb: 3 }}>
-                    <IconButton onClick={handlePreviousSong} sx={{ color: "#e0e0e0" }}>
+                    <IconButton onClick={handlePreviousSong} sx={{ color: theme.ink, borderRadius: 1, '&:hover': { bgcolor: theme.paperStripe, outline: `1.5px solid ${theme.ink}` } }}>
                       <SkipPrevious sx={{ fontSize: 32 }} />
                     </IconButton>
 
                     <IconButton 
                       onClick={togglePlayPause} 
                       sx={{ 
-                        bgcolor: "#bb86fc", // Changed to match toolbar accent
-                        color: "#121212", 
-                        '&:hover': { bgcolor: "#9d6cd5" }, 
+                        bgcolor: theme.primary,
+                        color: theme.paper, 
+                        border: `1.5px solid ${theme.ink}`,
+                        borderRadius: 1,
+                        '&:hover': { bgcolor: theme.primaryDark, transform: "translate(2px, 2px)", boxShadow: `1px 1px 0 ${theme.shadow}` }, 
                         p: 1.8,
                         transition: "all 0.3s",
-                        boxShadow: "0 4px 10px rgba(187, 134, 252, 0.3)"
+                        boxShadow: `3px 3px 0 ${theme.shadow}`
                       }}
                     >
                       {isPlaying ? <Pause sx={{ fontSize: 32 }} /> : <PlayArrow sx={{ fontSize: 32 }} />}
                     </IconButton>
 
-                    <IconButton onClick={handleNextSong} sx={{ color: "#e0e0e0" }}>
+                    <IconButton onClick={handleNextSong} sx={{ color: theme.ink, borderRadius: 1, '&:hover': { bgcolor: theme.paperStripe, outline: `1.5px solid ${theme.ink}` } }}>
                       <SkipNext sx={{ fontSize: 32 }} />
                     </IconButton>
                   </Stack>
 
                   {/* Volume Control */}
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <IconButton onClick={toggleMute} size="small" sx={{ color: "#bbb" }}>
+                    <IconButton onClick={toggleMute} size="small" sx={{ color: theme.ink, borderRadius: 1, '&:hover': { bgcolor: theme.paperStripe, outline: `1.5px solid ${theme.ink}` } }}>
                       {isMuted || volume === 0 ? <VolumeMute fontSize="small" /> : <VolumeUp fontSize="small" />}
                     </IconButton>
                     <Slider 
@@ -389,18 +559,126 @@ const MusicPlayer = () => {
                       aria-labelledby="volume-slider"
                       size="small"
                       sx={{ 
-                        color: "#bb86fc", // Changed to match toolbar accent
-                        opacity: 0.8
+                        color: theme.accent,
+                        opacity: 1,
+                        '& .MuiSlider-rail': { opacity: 1, bgcolor: theme.paperStripe, border: `1.5px solid ${theme.ink}` },
+                        '& .MuiSlider-track': { border: `1.5px solid ${theme.ink}` },
+                        '& .MuiSlider-thumb': { width: 0, height: 0 }
                       }}
                     />
                   </Box>
+
+                  {/* Song List */}
+                  <Box sx={{ mt: 3, pt: 3, borderTop: `1.5px solid ${theme.ink}` }}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between" sx={{ mb: 1.5 }}>
+                      <Typography variant="subtitle2" sx={{ color: theme.primary, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                        Songs ({songs.length})
+                      </Typography>
+                      <Button
+                        component="label"
+                        startIcon={<UploadFile />}
+                        variant="outlined"
+                        size="small"
+                        sx={{
+                          color: theme.ink,
+                          borderColor: theme.ink,
+                          borderRadius: 1,
+                          justifyContent: "center",
+                          boxShadow: `2px 2px 0 ${theme.shadow}`,
+                          '&:hover': {
+                            borderColor: theme.ink,
+                            bgcolor: theme.paperStripe,
+                            boxShadow: `1px 1px 0 ${theme.shadow}`,
+                            transform: "translate(1px, 1px)"
+                          }
+                        }}
+                      >
+                        Import MP3
+                        <input type="file" accept=".mp3,audio/mpeg" multiple hidden onChange={handleLocalSongUpload} />
+                      </Button>
+                    </Stack>
+
+                    <List dense disablePadding sx={{ border: `1.5px solid ${theme.ink}`, bgcolor: theme.paper }}>
+                      {visibleSongs.map((song, index) => {
+                        const absoluteIndex = (playlistPage - 1) * SONGS_PER_PAGE + index;
+                        const selected = absoluteIndex === songIndex;
+
+                        return (
+                          <ListItemButton
+                            key={`${song.url}-${absoluteIndex}`}
+                            selected={selected}
+                            onClick={() => handleSongSelect(absoluteIndex)}
+                            sx={{
+                              borderBottom: index === visibleSongs.length - 1 ? "none" : `1.5px solid ${theme.ink}`,
+                              bgcolor: selected ? theme.paperStripe : "transparent",
+                              '&.Mui-selected': { bgcolor: theme.paperStripe },
+                              '&.Mui-selected:hover, &:hover': { bgcolor: theme.paperAlt }
+                            }}
+                          >
+                            <ListItemAvatar sx={{ minWidth: 40 }}>
+                              <QueueMusic sx={{ color: selected ? theme.accent : theme.primary }} />
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={song.name}
+                              secondary={song.isLocal ? "Imported" : "GitHub repo"}
+                              primaryTypographyProps={{
+                                noWrap: true,
+                                sx: { color: theme.ink, fontWeight: selected ? 700 : 500 }
+                              }}
+                              secondaryTypographyProps={{
+                                sx: { color: theme.muted, letterSpacing: "0.04em" }
+                              }}
+                            />
+                          </ListItemButton>
+                        );
+                      })}
+                    </List>
+
+                    {playlistPageCount > 1 && (
+                      <Stack alignItems="center" sx={{ mt: 2 }}>
+                        <Pagination
+                          count={playlistPageCount}
+                          page={playlistPage}
+                          onChange={handlePlaylistPageChange}
+                          size="small"
+                          sx={{
+                            '& .MuiPaginationItem-root': {
+                              color: theme.ink,
+                              borderRadius: 1
+                            },
+                            '& .Mui-selected': {
+                              bgcolor: `${theme.primary} !important`,
+                              color: theme.paper
+                            }
+                          }}
+                        />
+                      </Stack>
+                    )}
+                  </Box>
                 </Box>
               </>
-            ) : (
+            ) : isLoadingSongs ? (
               <Box sx={{ p: 6, textAlign: "center" }}>
-                <Typography variant="h6" fontWeight="500" sx={{ color: "#aaa" }}>
+                <Typography variant="h6" fontWeight="700" sx={{ color: theme.muted, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   Loading songs...
                 </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ p: 4, textAlign: "center" }}>
+                {songsError && (
+                  <Alert severity="error" sx={{ mb: 3, border: `1.5px solid ${theme.ink}`, borderRadius: 1 }}>
+                    {songsError}
+                  </Alert>
+                )}
+                <Button
+                  component="label"
+                  startIcon={<UploadFile />}
+                  variant="outlined"
+                  sx={{ color: theme.ink, borderColor: theme.ink, borderRadius: 1 }}
+                >
+                  Import MP3
+                  <input type="file" accept=".mp3,audio/mpeg" multiple hidden onChange={handleLocalSongUpload} />
+                </Button>
               </Box>
             )}
           </Paper>
@@ -411,11 +689,13 @@ const MusicPlayer = () => {
           <Paper
             elevation={6}
             sx={{
-              p: 4,
-              bgcolor: "#1e1e1e",
-              borderRadius: 3,
-              color: "#e0e0e0",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)"
+              p: { xs: 3, sm: 4 },
+              bgcolor: theme.paper,
+              border: `1.5px solid ${theme.ink}`,
+              borderRadius: 2,
+              color: theme.ink,
+              boxShadow: `6px 6px 0 ${theme.shadow}`,
+              transition: "background-color 0.25s ease, color 0.25s ease"
             }}
           >
             <Typography 
@@ -423,9 +703,11 @@ const MusicPlayer = () => {
               component="h2" 
               sx={{ 
                 mb: 3, 
-                color: "#bb86fc",
-                fontWeight: 600,
-                borderBottom: "1px solid rgba(187, 134, 252, 0.3)",
+                color: theme.primary,
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                borderBottom: `1.5px solid ${theme.ink}`,
                 pb: 1
               }}
             >
@@ -450,8 +732,10 @@ const MusicPlayer = () => {
                 component="h3" 
                 sx={{ 
                   mb: 2, 
-                  color: "#bb86fc",
-                  fontWeight: 600 
+                  color: theme.primary,
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase"
                 }}
               >
                 Creator
@@ -462,9 +746,12 @@ const MusicPlayer = () => {
                   sx={{ 
                     width: 64, 
                     height: 64, 
-                    bgcolor: "#4a00e0",
+                    bgcolor: theme.paperStripe,
                     mr: 2,
-                    border: "2px solid #bb86fc"
+                    color: theme.ink,
+                    border: `1.5px solid ${theme.ink}`,
+                    borderRadius: 1,
+                    boxShadow: `3px 3px 0 ${theme.shadow}`
                   }}
                 >
                   RP
@@ -473,14 +760,14 @@ const MusicPlayer = () => {
                   <Typography variant="h6" sx={{ fontWeight: 500 }}>
                     Raja Rajan
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "#aaa", mb: 1 }}>
+                  <Typography variant="body2" sx={{ color: theme.muted, mb: 1 }}>
                     Full Stack Developer
                   </Typography>
                   <Stack direction="row" spacing={1}>
-                    <IconButton href="https://github.com/rajarajan15" size="small" sx={{ color: "#bb86fc" }}>
+                    <IconButton href="https://github.com/rajarajan15" size="small" sx={{ color: theme.ink, borderRadius: 1, '&:hover': { bgcolor: theme.paperStripe, outline: `1.5px solid ${theme.ink}` } }}>
                       <GitHub fontSize="small" />
                     </IconButton>
-                    <IconButton href="https://www.linkedin.com/in/rajarajan-a-p/" size="small" sx={{ color: "#bb86fc" }}>
+                    <IconButton href="https://www.linkedin.com/in/rajarajan-a-p/" size="small" sx={{ color: theme.ink, borderRadius: 1, '&:hover': { bgcolor: theme.paperStripe, outline: `1.5px solid ${theme.ink}` } }}>
                       <LinkedIn fontSize="small" />
                     </IconButton>
                   </Stack>
@@ -496,13 +783,16 @@ const MusicPlayer = () => {
         component="footer" 
         sx={{ 
           width: "100%", 
-          bgcolor: "#1a1a1a", 
+          bgcolor: theme.paper, 
+          color: theme.ink,
           py: 3,
           mt: "auto",
-          borderTop: "1px solid #333",
+          borderTop: `1.5px solid ${theme.ink}`,
+          boxShadow: `0 -4px 0 ${theme.shadow}`,
           // position: "fixed",
           bottom: 0,
-          zIndex: 10
+          zIndex: 10,
+          transition: "background-color 0.25s ease, color 0.25s ease"
         }}
       >
         <Container>
@@ -514,16 +804,16 @@ const MusicPlayer = () => {
             textAlign: { xs: "center", sm: "left" }
           }}>
             <Box sx={{ mb: { xs: 2, sm: 0 } }}>
-              <Typography variant="body2" sx={{ color: "#aaa" }}>
+              <Typography variant="body2" sx={{ color: theme.ink, letterSpacing: "0.04em" }}>
                 © 2025 MusePlay.
               </Typography>
-              <Typography variant="caption" sx={{ color: "#777", display: "block", mt: 0.5 }}>
+              <Typography variant="caption" sx={{ color: theme.muted, display: "block", mt: 0.5 }}>
                 Built with React
               </Typography>
             </Box>
             
             <Box sx={{ display: "flex", gap: 2 }}>
-              <Link href="mailto:rajarajanpanneerselvam15@gmail.com" underline="hover" sx={{ color: "#aaa", ":hover": { color: "#bb86fc" } }}>
+              <Link href="mailto:rajarajanpanneerselvam15@gmail.com" underline="hover" sx={{ color: theme.ink, ":hover": { color: theme.primary } }}>
                 <Typography variant="body2">Contact</Typography>
               </Link>
             </Box>
